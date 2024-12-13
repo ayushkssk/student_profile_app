@@ -488,7 +488,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
   String studentEmail = 'ayush.singh@example.com';
   String studentMobile = '+1 234 567 8900';
   final TextEditingController _nameController = TextEditingController();
-  final String? _imageUrl = 'https://picsum.photos/200';
+  final String _imageUrl = 'https://picsum.photos/200';
   File? _imageFile;
   final ImagePicker _picker = ImagePicker();
 
@@ -1066,7 +1066,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                         )
                       : _imageUrl != null
                           ? Image.network(
-                              _imageUrl!,
+                              _imageUrl,
                               fit: BoxFit.cover,
                               width: 120,
                               height: 120,
