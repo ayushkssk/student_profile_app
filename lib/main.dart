@@ -824,7 +824,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                  value ? ' Dark mode enabled' : 'Light mode enabled',
+                                  value ? 'Dark mode enabled' : 'Light mode enabled',
                                 ),
                                 behavior: SnackBarBehavior.floating,
                                 duration: const Duration(seconds: 1),
