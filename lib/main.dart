@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:tutorial_coach_mark/tutorial_coach_mark.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'dart:ui';
 
@@ -75,6 +77,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   final _studentIdController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isPasswordVisible = false;
+  bool _isTyping = false;
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   late Animation<Offset> _slideAnimation;
@@ -104,6 +107,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   ];
 
   List<Color> get _currentGradientColors {
+    if (_isTyping) {
+      return [Colors.blue, Colors.purple, Colors.pink];
+    }
     final progress = _rotationAnimation.value;
     final colorIndex = (progress * (_gradientColors.length - 1)).floor();
     final nextColorIndex = (colorIndex + 1) % _gradientColors.length;
@@ -150,11 +156,30 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       curve: Curves.linear,
     ));
 
+    _studentIdController.addListener(_handleTextChange);
+    _passwordController.addListener(_handleTextChange);
+
     _animationController.repeat();
+  }
+
+  void _handleTextChange() {
+    final newIsTyping = _studentIdController.text.isNotEmpty || _passwordController.text.isNotEmpty;
+    if (newIsTyping != _isTyping) {
+      setState(() {
+        _isTyping = newIsTyping;
+      });
+      if (_isTyping) {
+        _animationController.stop();
+      } else {
+        _animationController.repeat();
+      }
+    }
   }
 
   @override
   void dispose() {
+    _studentIdController.removeListener(_handleTextChange);
+    _passwordController.removeListener(_handleTextChange);
     _studentIdController.dispose();
     _passwordController.dispose();
     _animationController.dispose();
@@ -291,7 +316,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                                           ],
                                         ).createShader(bounds),
                                         child: Text(
-                                          'Welcome Back!',
+                                          'Welcome Back! Ayush',
                                           style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                                             fontWeight: FontWeight.bold,
                                             color: Colors.white,
@@ -480,6 +505,9 @@ class StudentProfilePage extends StatefulWidget {
 }
 
 class _StudentProfilePageState extends State<StudentProfilePage> {
+  final GlobalKey _profileImageKey = GlobalKey();
+  late TutorialCoachMark tutorialCoachMark;
+  bool _showedTutorial = false;
   bool isExpanded = false;
   bool isDarkMode = false;
   bool notificationsEnabled = true;
@@ -542,7 +570,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
             image: DecorationImage(
               image: _imageFile != null
                   ? FileImage(_imageFile!) as ImageProvider
-                  : NetworkImage(_imageUrl!),
+                  : NetworkImage(_imageUrl),
               fit: BoxFit.cover,
             ),
           ),
@@ -738,118 +766,128 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
   }
 
   void _handleSettings() {
-    showModalBottomSheet(
+    showDialog(
       context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).scaffoldBackgroundColor,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.1),
-                blurRadius: 10,
-                spreadRadius: 5,
-              ),
-            ],
+      builder: (BuildContext context) {
+        return Dialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 12),
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[400],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              SwitchListTile(
-                title: const Text('Dark Mode'),
-                subtitle: Text(
-                  isDarkMode ? 'Dark theme enabled' : 'Light theme enabled',
-                  style: TextStyle(
-                    color: Theme.of(context).textTheme.bodySmall?.color,
-                  ),
-                ),
-                secondary: Icon(
-                  isDarkMode ? Icons.dark_mode : Icons.light_mode,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                value: isDarkMode,
-                onChanged: (bool value) {
-                  setState(() => isDarkMode = value);
-                  widget.onThemeChanged(value);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(value ? 'Dark mode enabled' : 'Light mode enabled'),
-                      behavior: SnackBarBehavior.floating,
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.settings,
+                      color: Theme.of(context).colorScheme.primary,
+                      size: 24,
                     ),
-                  );
-                },
-              ),
-              SwitchListTile(
-                title: const Text('Notifications'),
-                subtitle: Text(
-                  notificationsEnabled ? 'You will receive notifications' : 'Notifications are disabled',
-                  style: TextStyle(
-                    color: Theme.of(context).textTheme.bodySmall?.color,
-                  ),
-                ),
-                secondary: Icon(
-                  notificationsEnabled ? Icons.notifications_active : Icons.notifications_off,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
-                value: notificationsEnabled,
-                onChanged: (bool value) {
-                  setState(() => notificationsEnabled = value);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text(
-                        value ? 'Notifications enabled' : 'Notifications disabled'
+                    const SizedBox(width: 12),
+                    Text(
+                      'Settings',
+                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
-                      behavior: SnackBarBehavior.floating,
                     ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(
-                  Icons.security,
-                  color: Theme.of(context).colorScheme.primary,
+                  ],
                 ),
-                title: const Text('Privacy'),
-                subtitle: const Text('Manage your privacy settings'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Privacy settings coming soon!'),
-                      behavior: SnackBarBehavior.floating,
+                const SizedBox(height: 20),
+                // Theme Settings
+                Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: Icon(
+                          isDarkMode ? Icons.dark_mode : Icons.light_mode,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        title: const Text('App Theme'),
+                        subtitle: Text(
+                          isDarkMode ? 'Dark theme enabled' : 'Light theme enabled',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        trailing: Switch(
+                          value: isDarkMode,
+                          onChanged: (bool value) {
+                            setState(() => isDarkMode = value);
+                            widget.onThemeChanged(value);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  value ? 'Dark mode enabled' : 'Light mode enabled',
+                                ),
+                                behavior: SnackBarBehavior.floating,
+                                duration: const Duration(seconds: 1),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Notification Settings
+                Container(
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceVariant.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Column(
+                    children: [
+                      ListTile(
+                        leading: Icon(
+                          notificationsEnabled ? Icons.notifications_active : Icons.notifications_off,
+                          color: Theme.of(context).colorScheme.primary,
+                        ),
+                        title: const Text('Notifications'),
+                        subtitle: Text(
+                          notificationsEnabled ? 'You will receive notifications' : 'Notifications are disabled',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                        trailing: Switch(
+                          value: notificationsEnabled,
+                          onChanged: (bool value) {
+                            setState(() => notificationsEnabled = value);
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
+                  children: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: Text(
+                        'Close',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.primary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
-                  );
-                },
-              ),
-              ListTile(
-                leading: Icon(
-                  Icons.logout,
-                  color: Theme.of(context).colorScheme.primary,
+                  ],
                 ),
-                title: const Text('Logout'),
-                onTap: () {
-                  Navigator.pop(context);
-                  _showLogoutConfirmation();
-                },
-              ),
-              const SizedBox(height: 20),
-            ],
+              ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -1327,9 +1365,181 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
     );
   }
 
+  Future<void> _checkAndShowTutorial() async {
+    final prefs = await SharedPreferences.getInstance();
+    _showedTutorial = prefs.getBool('profile_tutorial_shown') ?? false;
+    
+    if (!_showedTutorial) {
+      // Wait for the widget to be fully built
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        Future.delayed(const Duration(milliseconds: 500), () {
+          _showTutorial();
+        });
+      });
+    }
+  }
+
+  void _showTutorial() {
+    tutorialCoachMark = TutorialCoachMark(
+      targets: _createTargets(),
+      colorShadow: Theme.of(context).colorScheme.primary.withOpacity(0.8),
+      textSkip: "GOT IT!",
+      paddingFocus: 10,
+      opacityShadow: 0.8,
+      hideSkip: false,
+      textStyleSkip: const TextStyle(
+        color: Colors.white,
+        fontSize: 16,
+        fontWeight: FontWeight.bold,
+      ),
+      alignSkip: Alignment.bottomRight,
+      skipWidget: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primary,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.check_circle_outline,
+              color: Colors.white.withOpacity(0.9),
+              size: 20,
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              "GOT IT!",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+      onFinish: () {
+        _markTutorialAsShown();
+        return true;
+      },
+      onSkip: () {
+        _markTutorialAsShown();
+        return true;
+      },
+    );
+
+    tutorialCoachMark.show(context: context);
+  }
+
+  void _markTutorialAsShown() {
+    SharedPreferences.getInstance().then((prefs) {
+      prefs.setBool('profile_tutorial_shown', true);
+      setState(() {
+        _showedTutorial = true;
+      });
+    }).catchError((e) {
+      print('Error saving tutorial state: $e');
+    });
+  }
+
+  List<TargetFocus> _createTargets() {
+    return [
+      TargetFocus(
+        identify: "profile_image",
+        keyTarget: _profileImageKey,
+        alignSkip: Alignment.bottomRight,
+        enableOverlayTab: true,
+        contents: [
+          TargetContent(
+            align: ContentAlign.bottom,
+            builder: (context, controller) {
+              return Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface.withOpacity(0.9),
+                  borderRadius: BorderRadius.circular(16),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.touch_app,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          "Profile Access",
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.primary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      "Tap your profile picture to view and edit your complete profile information.",
+                      style: TextStyle(
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontSize: 16,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          color: Theme.of(context).colorScheme.secondary,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            "You can update your photo, contact info, and other details here.",
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.secondary,
+                              fontSize: 14,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      // Add more tutorial targets here
+    ];
+  }
+
   @override
   void initState() {
     super.initState();
+    _checkAndShowTutorial();
     _nameController.text = studentName;
   }
 
@@ -1342,6 +1552,233 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      drawer: Drawer(
+        child: Container(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          child: SafeArea(
+            child: Column(
+              children: [
+                DrawerHeader(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Theme.of(context).colorScheme.primary,
+                        Theme.of(context).colorScheme.secondary,
+                      ],
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      CircleAvatar(
+                        radius: 35,
+                        backgroundColor: Colors.white,
+                        child: ClipOval(
+                          child: Image.asset(
+                            'assets/images/profile_image.JPG',
+                            width: 70,
+                            height: 70,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        studentName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      Text(
+                        studentId,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.8),
+                          fontSize: 14,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        ListTile(
+                          leading: const Icon(Icons.dashboard_outlined),
+                          title: const Text('Dashboard'),
+                          onTap: () {
+                            Navigator.pop(context);
+                            // TODO: Implement dashboard navigation
+                          },
+                        ),
+                        ListTile(
+                          leading: const Icon(Icons.school_outlined),
+                          title: const Text('Academic Records'),
+                          onTap: () {
+                            Navigator.pop(context);
+                            // TODO: Implement academic records
+                          },
+                        ),
+                        ListTile(
+                          leading: const Icon(Icons.assignment_outlined),
+                          title: const Text('Assignments'),
+                          onTap: () {
+                            Navigator.pop(context);
+                            // TODO: Implement assignments
+                          },
+                        ),
+                        ListTile(
+                          leading: const Icon(Icons.calendar_today_outlined),
+                          title: const Text('Schedule'),
+                          onTap: () {
+                            Navigator.pop(context);
+                            // TODO: Implement schedule
+                          },
+                        ),
+                        const Divider(),
+                        ListTile(
+                          leading: Icon(
+                            Icons.logout,
+                            color: Theme.of(context).colorScheme.error,
+                          ),
+                          title: Text(
+                            'Logout',
+                            style: TextStyle(
+                              color: Theme.of(context).colorScheme.error,
+                            ),
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            _showLogoutConfirmation();
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      FittedBox(
+                        child: Text(
+                          'Version 1.0.0 • Last Updated: Dec 14, 2024',
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      FittedBox(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              'Designed & Developed with ',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                fontSize: 12,
+                              ),
+                            ),
+                            const Icon(
+                              Icons.favorite,
+                              color: Colors.red,
+                              size: 14,
+                            ),
+                            Text(
+                              ' by Ayush Singh',
+                              style: TextStyle(
+                                color: Theme.of(context).colorScheme.onSurface.withOpacity(0.6),
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+      floatingActionButton: TweenAnimationBuilder<double>(
+        duration: const Duration(milliseconds: 500),
+        tween: Tween(begin: 0, end: 1),
+        builder: (context, value, child) {
+          return Transform.scale(
+            scale: value,
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(30),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Theme.of(context).colorScheme.primary,
+                    Theme.of(context).colorScheme.secondary,
+                  ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Theme.of(context).colorScheme.primary.withOpacity(0.3),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  onTap: _showTutorial,
+                  borderRadius: BorderRadius.circular(30),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.help_outline,
+                            color: Colors.white,
+                            size: 16,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Help',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        },
+      ),
       body: CustomScrollView(
         slivers: [
           SliverAppBar(
@@ -1350,8 +1787,10 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
             pinned: true,
             backgroundColor: Theme.of(context).colorScheme.primary,
             title: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 GestureDetector(
+                  key: _profileImageKey,
                   onTap: () => _showProfileCard(context),
                   child: Hero(
                     tag: 'profile-image',
@@ -1368,108 +1807,150 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      Clipboard.setData(ClipboardData(text: studentId));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Student ID copied to clipboard'),
-                          duration: Duration(seconds: 1),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Stack(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.notifications_outlined, color: Colors.white),
+                          onPressed: () {
+                            // TODO: Implement notifications
+                          },
                         ),
-                      );
-                    },
-                    child: Text(
-                      studentId,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.white.withOpacity(0.9),
-                      ),
-                    ),
-                  ),
-                ),
-                PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, color: Colors.white),
-                  elevation: 8,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  position: PopupMenuPosition.under,
-                  offset: const Offset(0, 8),
-                  onSelected: (value) {
-                    switch (value) {
-                      case 'edit':
-                        _handleEditProfile();
-                        break;
-                      case 'share':
-                        _handleShareProfile();
-                        break;
-                      case 'settings':
-                        _handleSettings();
-                        break;
-                      case 'logout':
-                        _showLogoutConfirmation();
-                        break;
-                    }
-                  },
-                  itemBuilder: (BuildContext context) => [
-                    PopupMenuItem(
-                      value: 'edit',
-                      child: Row(
-                        children: [
-                          Icon(Icons.edit, 
-                            size: 20,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(width: 12),
-                          const Text('Edit Profile'),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'share',
-                      child: Row(
-                        children: [
-                          Icon(Icons.share,
-                            size: 20,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(width: 12),
-                          const Text('Share Profile'),
-                        ],
-                      ),
-                    ),
-                    PopupMenuItem(
-                      value: 'settings',
-                      child: Row(
-                        children: [
-                          Icon(Icons.settings,
-                            size: 20,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                          const SizedBox(width: 12),
-                          const Text('Settings'),
-                        ],
-                      ),
-                    ),
-                    const PopupMenuDivider(),
-                    PopupMenuItem(
-                      value: 'logout',
-                      child: Row(
-                        children: [
-                          Icon(Icons.logout,
-                            size: 20,
-                            color: Theme.of(context).colorScheme.error,
-                          ),
-                          const SizedBox(width: 12),
-                          Text('Logout',
-                            style: TextStyle(
-                              color: Theme.of(context).colorScheme.error,
+                        Positioned(
+                          right: 8,
+                          top: 8,
+                          child: Container(
+                            padding: const EdgeInsets.all(4),
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            constraints: const BoxConstraints(
+                              minWidth: 16,
+                              minHeight: 16,
+                            ),
+                            child: const Center(
+                              child: Text(
+                                '3',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ),
-                        ],
+                        ),
+                      ],
+                    ),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert, color: Colors.white),
+                      elevation: 8,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(15),
                       ),
+                      position: PopupMenuPosition.under,
+                      offset: const Offset(0, 8),
+                      onSelected: (value) {
+                        switch (value) {
+                          case 'edit':
+                            _handleEditProfile();
+                            break;
+                          case 'share':
+                            _handleShareProfile();
+                            break;
+                          case 'theme':
+                            setState(() => isDarkMode = !isDarkMode);
+                            widget.onThemeChanged(isDarkMode);
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  isDarkMode ? 'Dark mode enabled' : 'Light mode enabled',
+                                ),
+                                behavior: SnackBarBehavior.floating,
+                                duration: const Duration(seconds: 1),
+                              ),
+                            );
+                            break;
+                          case 'settings':
+                            _handleSettings();
+                            break;
+                          case 'logout':
+                            _showLogoutConfirmation();
+                            break;
+                        }
+                      },
+                      itemBuilder: (BuildContext context) => [
+                        PopupMenuItem(
+                          value: 'edit',
+                          child: Row(
+                            children: [
+                              Icon(Icons.edit, 
+                                size: 20,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              const SizedBox(width: 12),
+                              const Text('Edit Profile'),
+                            ],
+                          ),
+                        ),
+                        PopupMenuItem(
+                          value: 'share',
+                          child: Row(
+                            children: [
+                              Icon(Icons.share,
+                                size: 20,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              const SizedBox(width: 12),
+                              const Text('Share Profile'),
+                            ],
+                          ),
+                        ),
+                        // PopupMenuItem(
+                        //   value: 'theme',
+                        //   child: Row(
+                        //     children: [
+                        //       Icon(
+                        //         isDarkMode ? Icons.dark_mode : Icons.light_mode,
+                        //         size: 20,
+                        //         color: Theme.of(context).colorScheme.primary,
+                        //       ),
+                        //       const SizedBox(width: 12),
+                        //       Text(isDarkMode ? 'Light Mode' : 'Dark Mode'),
+                        //     ],
+                        //   ),
+                        // ),
+                        PopupMenuItem(
+                          value: 'settings',
+                          child: Row(
+                            children: [
+                              Icon(Icons.settings,
+                                size: 20,
+                                color: Theme.of(context).colorScheme.primary,
+                              ),
+                              const SizedBox(width: 12),
+                              const Text('Settings'),
+                            ],
+                          ),
+                        ),
+                        const PopupMenuDivider(),
+                        PopupMenuItem(
+                          value: 'logout',
+                          child: Row(
+                            children: [
+                              Icon(Icons.logout,
+                                size: 20,
+                                color: Theme.of(context).colorScheme.error,
+                              ),
+                              const SizedBox(width: 12),
+                              const Text('Logout'),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
