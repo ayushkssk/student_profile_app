@@ -609,7 +609,7 @@ class _StudentProfilePageState extends State<StudentProfilePage> {
           children: [
             Icon(Icons.edit, color: Theme.of(context).colorScheme.primary),
             const SizedBox(width: 12),
-            const Text('Edit Profile'),
+            const Text('Edit Profile.'),
           ],
         ),
         content: Column(
